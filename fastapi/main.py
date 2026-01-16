@@ -3,6 +3,8 @@ from pymongo import MongoClient
 from minio import Minio
 import os
 
+print("Starting Cloud Banking API...")
+
 app = FastAPI(title="Cloud Banking API")
 
 # MongoDB connection

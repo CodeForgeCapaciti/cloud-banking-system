@@ -20,7 +20,12 @@ jobs:
         run: docker build -t cloud-banking-api ./fastapi
 
       - name: Run FastAPI container
-        run: docker run -d -p 8000:8000 cloud-banking-api
+        run: |
+          docker run \
+            --name cloud-banking-api-container \
+            -d \
+            -p 8000:8000 \
+            cloud-banking-api
 
       - name: Wait for FastAPI to start
         run: |
@@ -30,12 +35,12 @@ jobs:
               echo "FastAPI is up!"
               exit 0
             fi
-            echo "FastAPI not ready yet... retrying"
+            echo "FastAPI not ready yet..."
             sleep 2
           done
-          echo "FastAPI failed to start in time"
-          docker ps
-          docker logs $(docker ps -q)
+          echo "FastAPI failed to start. Printing logs:"
+          docker ps -a
+          docker logs cloud-banking-api-container
           exit 1
 
       - name: Test API endpoint
