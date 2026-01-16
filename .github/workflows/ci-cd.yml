@@ -1,0 +1,26 @@
+name: Cloud Banking CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build FastAPI Docker image
+        run: docker build -t cloud-banking-api ./fastapi
+
+      - name: Run FastAPI container
+        run: docker run -d -p 8000:8000 cloud-banking-api
+
+      - name: Test API endpoint
+        run: curl http://localhost:8000
