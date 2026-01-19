@@ -1,35 +1,36 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
 from pymongo import MongoClient
 from minio import Minio
 import os
 
-print("Starting Cloud Banking API...")
-
 app = FastAPI(title="Cloud Banking API")
 
-# MongoDB (safe default for CI)
-mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-mongo_client = MongoClient(mongo_url)
+# MongoDB connection
+mongo_client = MongoClient(os.getenv("MONGO_URL"))
 db = mongo_client["bankdb"]
 
-# MinIO (optional – only initialize if configured)
-minio_client = None
+# MinIO connection
+minio_client = Minio(
+    os.getenv("MINIO_ENDPOINT"),
+    access_key=os.getenv("MINIO_ACCESS_KEY"),
+    secret_key=os.getenv("MINIO_SECRET_KEY"),
+    secure=False
+)
 
-minio_endpoint = os.getenv("MINIO_ENDPOINT")
-minio_access_key = os.getenv("MINIO_ACCESS_KEY")
-minio_secret_key = os.getenv("MINIO_SECRET_KEY")
-
-if minio_endpoint and minio_access_key and minio_secret_key:
-    minio_client = Minio(
-        minio_endpoint,
-        access_key=minio_access_key,
-        secret_key=minio_secret_key,
-        secure=False
-    )
-    print("MinIO client initialized")
-else:
-    print("MinIO not configured – running without object storage")
+# ------------------------
+# Pydantic model for JSON body
+# ------------------------
+class Account(BaseModel):
+    name: str
+    balance: float
 
 @app.get("/")
 def root():
     return {"message": "Cloud Banking API is running"}
+
+@app.post("/accounts")
+def create_account(account: Account):
+    # Insert JSON data into MongoDB
+    db.accounts.insert_one(account.dict())
+    return {"status": "Account created", "account": account}

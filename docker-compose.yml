@@ -1,5 +1,10 @@
+version: "3.9"
+
 services:
 
+  # ------------------------
+  # MongoDB
+  # ------------------------
   mongodb:
     image: mongo:6
     container_name: mongodb
@@ -9,6 +14,9 @@ services:
       - mongo-data:/data/db
     restart: always
 
+  # ------------------------
+  # MinIO
+  # ------------------------
   minio:
     image: minio/minio
     container_name: minio
@@ -23,11 +31,14 @@ services:
       - minio-data:/data
     restart: always
 
+  # ------------------------
+  # FastAPI Backend (Private)
+  # ------------------------
   fastapi:
     build: ./fastapi
     container_name: fastapi
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"    # INTERNAL only
     depends_on:
       - mongodb
       - minio
@@ -38,6 +49,66 @@ services:
       MINIO_SECRET_KEY: admin123
     restart: always
 
+  # ------------------------
+  # Kong API Gateway Database
+  # ------------------------
+  kong-db:
+    image: postgres:13
+    container_name: kong-db
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_DB: kong
+      POSTGRES_PASSWORD: kong
+    volumes:
+      - kong-data:/var/lib/postgresql/data
+    restart: always
+
+  # ------------------------
+  # Kong Migrations
+  # ------------------------
+  kong-migrations:
+    image: kong:3.6
+    container_name: kong-migrations
+    command: kong migrations bootstrap
+    depends_on:
+      - kong-db
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    restart: "no"
+
+  # ------------------------
+  # Kong API Gateway
+  # ------------------------
+  kong:
+    image: kong:3.6
+    container_name: kong
+    depends_on:
+      - kong-db
+      - kong-migrations
+      - fastapi
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+    ports:
+      - "8000:8000"   # Public API Gateway
+      - "8001:8001"   # Kong Admin API
+    restart: always
+
+# ------------------------
+# Volumes
+# ------------------------
 volumes:
   mongo-data:
   minio-data:
+  kong-data:
