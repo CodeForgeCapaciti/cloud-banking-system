@@ -110,6 +110,7 @@ class Account(BaseModel):
     name: str
     balance: float
 
+
 @app.get("/")
 def root():
     return {"message": "Cloud Banking API is running"}
@@ -118,7 +119,3 @@ def root():
 def create_account(account: Account):
     db.accounts.insert_one(account.dict())
     return {"status": "Account created", "account": account}
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello World"}
