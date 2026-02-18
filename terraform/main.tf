@@ -20,3 +20,7 @@ resource "docker_volume" "mongo_data" {
 resource "docker_volume" "minio_data" {
   name = "minio-data"
 }
+
+output "minio_volume_name" {
+  value = docker_volume.minio_data.name
+}
