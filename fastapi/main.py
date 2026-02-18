@@ -21,3 +21,8 @@ minio_client = Minio(
 # ------------------------
 # Pydantic model for JSON body
 # ------------------------
+class Account(BaseModel):
+    name: str
+    balance: float
+
+
