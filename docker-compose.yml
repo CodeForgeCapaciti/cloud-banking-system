@@ -1,10 +1,9 @@
-version: "3.9"
+
 
 services:
-
-  # ------------------------
+  # ========================
   # MongoDB
-  # ------------------------
+  # ========================
   mongodb:
     image: mongo:6
     container_name: mongodb
@@ -14,64 +13,67 @@ services:
       - mongo-data:/data/db
     restart: always
 
-  # ------------------------
+  # ========================
   # MinIO
-  # ------------------------
+  # ========================
   minio:
     image: minio/minio
     container_name: minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: admin123
-    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio-data:/data
     restart: always
 
-  # ------------------------
-  # FastAPI Backend (Private)
-  # ------------------------
+  # ========================
+  # FastAPI (PRIVATE)
+  # ========================
   fastapi:
     build: ./fastapi
     container_name: fastapi
-    expose:
-      - "8000"    # INTERNAL only
-    depends_on:
-      - mongodb
-      - minio
+    ports:
+      - "8001:8000"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       MONGO_URL: mongodb://mongodb:27017/bankdb
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: admin
       MINIO_SECRET_KEY: admin123
+    depends_on:
+      mongodb:
+        condition: service_started
+      minio:
+        condition: service_started
     restart: always
 
-  # ------------------------
-  # Kong API Gateway Database
-  # ------------------------
+
+  # Kong Database
+
   kong-db:
     image: postgres:13
     container_name: kong-db
     environment:
       POSTGRES_USER: kong
-      POSTGRES_DB: kong
       POSTGRES_PASSWORD: kong
+      POSTGRES_DB: kong
     volumes:
       - kong-data:/var/lib/postgresql/data
     restart: always
 
-  # ------------------------
-  # Kong Migrations
-  # ------------------------
+
+  # Kong Migrations (RUN ONCE)
+
   kong-migrations:
     image: kong:3.6
-    container_name: kong-migrations
-    command: kong migrations bootstrap
+    command: ["kong", "migrations", "bootstrap"]
     depends_on:
-      - kong-db
+      kong-db:
+        condition: service_started
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-db
@@ -79,36 +81,94 @@ services:
       KONG_PG_PASSWORD: kong
     restart: "no"
 
-  # ------------------------
+
   # Kong API Gateway
-  # ------------------------
+  
   kong:
     image: kong:3.6
     container_name: kong
     depends_on:
-      - kong-db
-      - kong-migrations
-      - fastapi
+      kong-db:
+        condition: service_started
+      fastapi:
+        condition: service_started
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-db
       KONG_PG_USER: kong
       KONG_PG_PASSWORD: kong
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_ADMIN_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8002
     ports:
-      - "8000:8000"   # Public API Gateway
-      - "8001:8001"   # Kong Admin API
+      - "8000:8000"   # PUBLIC API
+      - "8002:8002"   # ADMIN API
     restart: always
 
-# ------------------------
+  # Prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      fastapi:
+        condition: service_started
+    restart: always
+
+  # Grafana
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: always
+
+
+  # Elasticsearch
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    restart: always
+
+
+  # Kibana
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    restart: always
+
+
 # Volumes
-# ------------------------
+
 volumes:
   mongo-data:
   minio-data:
   kong-data:
+  grafana-data:
+  esdata:
