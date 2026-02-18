@@ -164,11 +164,3 @@ services:
     restart: always
 
 
-# Volumes
-
-volumes:
-  mongo-data:
-  minio-data:
-  kong-data:
-  grafana-data:
-  esdata:
