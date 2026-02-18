@@ -21,16 +21,3 @@ minio_client = Minio(
 # ------------------------
 # Pydantic model for JSON body
 # ------------------------
-class Account(BaseModel):
-    name: str
-    balance: float
-
-@app.get("/")
-def root():
-    return {"message": "Cloud Banking API is running"}
-
-@app.post("/accounts")
-def create_account(account: Account):
-    # Insert JSON data into MongoDB
-    db.accounts.insert_one(account.dict())
-    return {"status": "Account created", "account": account}
