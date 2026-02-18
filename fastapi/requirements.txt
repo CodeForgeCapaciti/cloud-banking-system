@@ -1,4 +1,7 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pymongo
 minio
+prometheus-client
+python-dotenv
+python-json-logger
